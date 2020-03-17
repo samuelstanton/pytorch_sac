@@ -51,3 +51,9 @@ class ReplayBuffer(object):
                                            device=self.device)
 
         return obses, actions, rewards, next_obses, not_dones, not_dones_no_max
+
+    def return_all_samples(self):
+        arrays = [self.obses, self.actions, self.rewards, self.next_obses]
+        start_idx = self.idx - self.capacity if self.full else 0
+        idx_range = np.arange(start_idx, self.idx)
+        return [array[idx_range] for array in arrays]

@@ -202,3 +202,7 @@ class Logger(object):
             self._train_mg.dump(step, 'train', save)
         else:
             raise f'invalid log type: {ty}'
+
+    def log_dict(self, dict, step):
+        for key, value in dict.items():
+            self.log(key, value, step)
