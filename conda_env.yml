@@ -1,4 +1,4 @@
-name: pytorch_sac
+name: pytorch_mbpo
 channels:
   - defaults
 dependencies:
@@ -15,3 +15,4 @@ dependencies:
     - imageio
     - imageio-ffmpeg
     - hydra-core
+    - git+git://github.com/samuelstanton/model-zoo.git
