@@ -1,0 +1,7 @@
+task:
+  name: gym_hopper
+  universe: openai_gym
+  env: Walker2d-v2
+agent:
+  params:
+    target_entropy: -3.

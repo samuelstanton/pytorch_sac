@@ -1,0 +1,44 @@
+defaults:
+    - agent: sac
+    - fwd_model: gp_ensemble
+    - fwd_dataset: bootstrap_dataset
+
+env: hopper_hop
+
+# this needs to be specified manually
+experiment: test_exp
+
+num_train_steps: 300000
+env_buffer_capacity: ${num_train_steps}
+agent_update_freq: 20  # number of agent updates per env step
+fit_fwd_freq: 250 # number of env steps per forward model update
+
+rollout_batch_size: 5000
+num_rollouts: 20
+rollouts_retained: 80
+rollout_length: 1
+model_buffer_capacity: 400000  # rollout_batch_size * rollouts_retained * rollout_length
+
+num_seed_steps: 5000
+
+eval_frequency: 10000
+num_eval_episodes: 10
+
+device: cuda
+
+# logger
+log_frequency: 10000
+log_save_tb: true
+
+# video recorder
+save_video: true
+
+
+seed: 1
+
+
+# hydra configuration
+hydra:
+    name: ${env}
+    run:
+        dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${agent.name}_${experiment}

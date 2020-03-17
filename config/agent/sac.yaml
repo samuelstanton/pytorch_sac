@@ -10,6 +10,7 @@ agent:
     actor_cfg: ${diag_gaussian_actor}
     discount: 0.99
     init_temperature: 0.1
+    target_entropy: ???
     alpha_lr: 1e-4
     alpha_betas: [0.9, 0.999]
     actor_lr: 1e-4

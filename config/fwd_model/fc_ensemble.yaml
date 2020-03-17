@@ -1,0 +1,17 @@
+fwd_model:
+  name: fc_ensemble
+  class: model_zoo.ensemble.FCEnsemble
+  params:
+    input_dim: ???
+    target_dim: ???
+    num_components: 7
+    num_elites: 5
+    submodule_params:
+      hidden_width: 200
+      hidden_depth: 4
+      activation: swish
+      max_epochs_since_update: 5
+  fit_kwargs:
+    batch_size: 256
+    lr: 1e-3
+    logvar_penalty_coeff: 1e-2

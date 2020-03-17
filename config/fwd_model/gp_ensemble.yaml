@@ -1,0 +1,22 @@
+fwd_model:
+  name: gp_ensemble
+  class: model_zoo.ensemble.GPEnsemble
+  params:
+    input_dim: ???
+    target_dim: ???
+    num_components: 7
+    num_elites: 5
+    submodule_params:
+      feature_dim: ???
+      hidden_width: 512
+      hidden_depth: 2
+      n_inducing: 256
+      batch_size: 256
+      max_epochs_since_update: 2
+  fit_kwargs:
+    pretrain: False
+    objective: pll
+    normalize: True
+    early_stopping: True
+    reinit_inducing_loc: False
+    max_steps: None
