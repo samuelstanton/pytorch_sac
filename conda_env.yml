@@ -7,6 +7,7 @@ dependencies:
   - cudatoolkit=9.2
   - absl-py
   - pyparsing
+  - patchelf=0.10
   - pip:
     - termcolor
     - git+git://github.com/deepmind/dm_control.git
@@ -16,3 +17,4 @@ dependencies:
     - imageio-ffmpeg
     - hydra-core
     - git+git://github.com/samuelstanton/model-zoo.git
+    - mujoco-py
