@@ -84,7 +84,13 @@ class Workspace(object):
             episode_reward = 0
             while not done:
                 with utils.eval_mode(self.agent):
-                    action = self.agent.act(obs, sample=False)
+                    if self.cfg.renormalize:
+                        obs_norm = (obs - self.replay_buffer.mean_obs_np) / \
+                          self.replay_buffer.std_obs_np
+                        action = self.agent.act(obs_norm, sample=False)
+                    else:
+                        action = self.agent.act(obs_norm, sample=False)
+
                 obs, reward, done, _ = self.env.step(action)
                 self.video_recorder.record(self.env)
                 episode_reward += reward
@@ -122,12 +128,23 @@ class Workspace(object):
 
                 self.logger.log('train/episode', episode, self.step)
 
+            if self.cfg.renormalize and self.replay_buffer.idx > 0 and \
+                self.step % self.cfg.renormalize_freq == 0 and \
+                self.step < self.cfg.num_train_steps - 1000:
+                    self.replay_buffer.renormalize_obs()
+
+
             # sample action for data collection
             if self.step < self.cfg.num_seed_steps:
                 action = self.env.action_space.sample()
             else:
                 with utils.eval_mode(self.agent):
-                    action = self.agent.act(obs, sample=True)
+                    if self.cfg.renormalize:
+                        obs_norm = (obs - self.replay_buffer.mean_obs_np) / \
+                          self.replay_buffer.std_obs_np
+                        action = self.agent.act(obs_norm, sample=True)
+                    else:
+                        action = self.agent.act(obs_norm, sample=True)
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:

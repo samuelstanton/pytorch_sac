@@ -9,6 +9,9 @@ experiment: test_exp
 num_train_steps: 1e6
 replay_buffer_capacity: ${num_train_steps}
 
+renormalize: True
+renormalize_freq: 1000
+
 num_seed_steps: 5000
 
 eval_frequency: 10000
