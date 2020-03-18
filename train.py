@@ -7,40 +7,22 @@ import copy
 import math
 import os
 import sys
+import shutil
 import time
 import pickle as pkl
 
-
+import hydra
 
 from video import VideoRecorder
+# from common import utils, dmc
 from logger import Logger
 from replay_buffer import ReplayBuffer
 import utils
 
-import dmc2gym
-import hydra
-
-
-def make_env(cfg):
-    """Helper function to create dm_control environment"""
-    if cfg.env == 'ball_in_cup_catch':
-        domain_name = 'ball_in_cup'
-        task_name = 'catch'
-    else:
-        domain_name = cfg.env.split('_')[0]
-        task_name = '_'.join(cfg.env.split('_')[1:])
-
-    env = dmc2gym.make(domain_name=domain_name,
-                       task_name=task_name,
-                       seed=cfg.seed,
-                       visualize_reward=True)
-    env.seed(cfg.seed)
-    assert env.action_space.low.min() >= -1
-    assert env.action_space.high.max() <= 1
-
-    return env
-
-
+if os.isatty(sys.stdout.fileno()):
+    from IPython.core import ultratb
+    sys.excepthook = ultratb.FormattedTB(
+        mode='Verbose', color_scheme='Linux', call_pdb=1)
 
 class Workspace(object):
     def __init__(self, cfg):
@@ -57,8 +39,12 @@ class Workspace(object):
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
         self.env = utils.make_env(cfg)
+        self.episode = 0
+        self.episode_step = 0
+        self.episode_reward = 0
+        self.done = False
 
-        cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
+        cfg.agent.params.obs_dim = int(self.env.observation_space.shape[0])
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
         cfg.agent.params.action_range = [
             float(self.env.action_space.low.min()),
@@ -66,17 +52,30 @@ class Workspace(object):
         ]
         self.agent = hydra.utils.instantiate(cfg.agent)
 
-        self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
-                                          self.env.action_space.shape,
-                                          int(cfg.replay_buffer_capacity),
-                                          self.device)
+        if isinstance(cfg.replay_buffer_capacity, str):
+            cfg.replay_buffer_capacity = int(eval(cfg.replay_buffer_capacity))
+
+        self.replay_buffer = ReplayBuffer(
+            self.env.observation_space.shape,
+            self.env.action_space.shape,
+            int(cfg.replay_buffer_capacity),
+            self.device
+        )
+        self.replay_dir = os.path.join(self.work_dir, 'replay')
 
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
+
         self.step = 0
+        self.steps_since_eval = 0
+        self.steps_since_save = 0
+        self.best_eval_rew = None
 
     def evaluate(self):
+        episode_rewards = []
         for episode in range(self.cfg.num_eval_episodes):
+            if self.cfg.fixed_eval:
+                self.env.seed(episode)
             obs = self.env.reset()
             self.agent.reset()
             self.video_recorder.init(enabled=(episode == 0))
@@ -89,50 +88,73 @@ class Workspace(object):
                           self.replay_buffer.std_obs_np
                         action = self.agent.act(obs_norm, sample=False)
                     else:
-                        action = self.agent.act(obs_norm, sample=False)
-
+                        action = self.agent.act(obs, sample=False)
                 obs, reward, done, _ = self.env.step(action)
                 self.video_recorder.record(self.env)
                 episode_reward += reward
+            episode_rewards.append(episode_reward)
 
             self.video_recorder.save(f'{self.step}.mp4')
             self.logger.log('eval/episode_reward', episode_reward, self.step)
+        if self.cfg.fixed_eval:
+            self.env.seed(None)
         self.logger.dump(self.step)
+        return np.mean(episode_rewards)
 
     def run(self):
-        episode, episode_reward, done = 0, 0, True
+        assert not self.done
+        assert self.episode_reward == 0.0
+        assert self.episode_step == 0
+        self.agent.reset()
+        obs = self.env.reset()
+
         start_time = time.time()
         while self.step < self.cfg.num_train_steps:
-            if done:
+            if self.done:
                 if self.step > 0:
+                    self.logger.log(
+                        'train/episode_reward', self.episode_reward, self.step)
                     self.logger.log('train/duration',
                                     time.time() - start_time, self.step)
+                    self.logger.log('train/episode', self.episode, self.step)
                     start_time = time.time()
                     self.logger.dump(
                         self.step, save=(self.step > self.cfg.num_seed_steps))
 
                 # evaluate agent periodically
-                if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
-                    self.logger.log('eval/episode', episode, self.step)
-                    self.evaluate()
+                if self.steps_since_eval >= self.cfg.eval_frequency:
+                    self.logger.log('eval/episode', self.episode, self.step)
+                    eval_rew = self.evaluate()
+                    self.steps_since_eval = 0
 
-                self.logger.log('train/episode_reward', episode_reward,
-                                self.step)
+                    if self.best_eval_rew is None or eval_rew > self.best_eval_rew:
+                        self.save(tag='best')
+                        self.best_eval_rew = eval_rew
 
+
+                if self.step > 0 and self.cfg.save_frequency and \
+                  self.steps_since_save >= self.cfg.save_frequency:
+                    tag = str(self.step).zfill(self.cfg.save_zfill)
+                    self.save(tag=tag)
+                    self.steps_since_save = 0
+
+                if self.cfg.num_initial_states is not None:
+                    self.env.seed(self.episode % self.cfg.num_initial_states)
                 obs = self.env.reset()
                 self.agent.reset()
-                done = False
-                episode_reward = 0
-                episode_step = 0
-                episode += 1
+                self.done = False
+                self.episode_reward = 0
+                self.episode_step = 0
+                self.episode += 1
 
-                self.logger.log('train/episode', episode, self.step)
+                self.replay_buffer.save(self.replay_dir)
+                if self.cfg.save_latest:
+                    self.save(tag='latest')
 
             if self.cfg.renormalize and self.replay_buffer.idx > 0 and \
                 self.step % self.cfg.renormalize_freq == 0 and \
                 self.step < self.cfg.num_train_steps - 1000:
                     self.replay_buffer.renormalize_obs()
-
 
             # sample action for data collection
             if self.step < self.cfg.num_seed_steps:
@@ -144,31 +166,87 @@ class Workspace(object):
                           self.replay_buffer.std_obs_np
                         action = self.agent.act(obs_norm, sample=True)
                     else:
-                        action = self.agent.act(obs_norm, sample=True)
+                        action = self.agent.act(obs, sample=True)
 
             # run training update
-            if self.step >= self.cfg.num_seed_steps:
+            if self.step >= self.cfg.num_seed_steps-1:
                 self.agent.update(self.replay_buffer, self.logger, self.step)
 
-            next_obs, reward, done, _ = self.env.step(action)
+            next_obs, reward, self.done, _ = self.env.step(action)
 
             # allow infinite bootstrap
-            done = float(done)
-            done_no_max = 0 if episode_step + 1 == self.env._max_episode_steps else done
-            episode_reward += reward
+            done_float = float(self.done)
+            done_no_max = done_float if self.episode_step + 1 < self.env._max_episode_steps \
+              else 0.
+            self.episode_reward += reward
 
-            self.replay_buffer.add(obs, action, reward, next_obs, done,
-                                   done_no_max)
+            self.replay_buffer.add(obs, action, reward, next_obs, done_float, done_no_max)
 
             obs = next_obs
-            episode_step += 1
+            self.episode_step += 1
             self.step += 1
+            self.steps_since_eval += 1
+            self.steps_since_save += 1
 
+
+        if self.steps_since_eval > 1:
+            self.logger.log('eval/episode', self.episode, self.step)
+            self.evaluate()
+
+        if self.cfg.delete_replay_at_end:
+            shutil.rmtree(self.replay_dir)
+
+    def save(self, tag='latest'):
+        path = os.path.join(self.work_dir, f'{tag}.pkl')
+        with open(path, 'wb') as f:
+            pkl.dump(self, f)
+
+    @staticmethod
+    def load(work_dir, tag='latest'):
+        path = os.path.join(work_dir, f'{tag}.pkl')
+        with open(path, 'rb') as f:
+            return pkl.load(f)
+
+    def __getstate__(self):
+        d = copy.copy(self.__dict__)
+        del d['replay_buffer'], d['logger'], d['env']
+        return d
+
+    def __setstate__(self, d):
+        self.__dict__ = d
+        # override work_dir
+        self.work_dir = os.getcwd()
+        self.logger = Logger(self.work_dir,
+                             save_tb=self.cfg.log_save_tb,
+                             log_frequency=self.cfg.log_frequency)
+        self.env = utils.make_env(self.cfg)
+        if 'max_episode_steps' in self.cfg and self.cfg.max_episode_steps is not None:
+            self.env._max_episode_steps = self.cfg.max_episode_steps
+        self.episode_step = 0
+        self.episode_reward = 0
+        self.done = False
+
+        # Re-initialize an empty replay buffer.
+        self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
+                                          self.env.action_space.shape,
+                                          int(self.cfg.replay_buffer_capacity),
+                                          self.device)
+        if os.path.exists(self.replay_dir):
+            self.replay_buffer.load(self.replay_dir)
 
 
 @hydra.main(config_path='config/train.yaml', strict=True)
 def main(cfg):
-    workspace = Workspace(cfg)
+    # this needs to be done for successful pickle
+    SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+    from train import Workspace as W
+    fname = os.getcwd() + '/latest.pkl'
+    if os.path.exists(fname):
+        with open(fname, 'rb') as f:
+            workspace = pkl.load(f)
+    else:
+        workspace = W(cfg)
+
     workspace.run()
 
 
