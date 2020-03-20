@@ -2,17 +2,20 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
+from utils import MLP
 
 import utils
 
 
 class DoubleQCritic(nn.Module):
     """Critic network, employes double Q-learning."""
-    def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth):
+    def __init__(self, obs_dim, action_dim, hidden_dim, hidden_depth, init='default'):
         super().__init__()
 
-        self.Q1 = utils.mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth)
-        self.Q2 = utils.mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth)
+        # self.Q1 = utils.mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth)
+        # self.Q2 = utils.mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth)
+        self.Q1 = MLP(obs_dim + action_dim, hidden_dim, 1, hidden_depth, init=init)
+        self.Q2 = MLP(obs_dim + action_dim, hidden_dim, 1, hidden_depth, init=init)
 
         self.outputs = dict()
         self.apply(utils.weight_init)
