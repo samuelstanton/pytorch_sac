@@ -15,7 +15,7 @@ class SACAgent(Agent):
     """SAC algorithm."""
     def __init__(self, obs_dim, action_dim, action_range, device,
                  critic_cfg, actor_cfg, discount, init_temperature, target_entropy, alpha_lr,
-                 alpha_betas, actor_lr, actor_betas, actor_update_frequency,
+                 alpha_betas, actor_lr, actor_betas, actor_update_frequency, critic_update_frequency,
                  critic_lr, critic_betas, critic_tau,
                  critic_target_update_frequency, batch_size):
         super().__init__()
@@ -25,6 +25,7 @@ class SACAgent(Agent):
         self.discount = discount
         self.critic_tau = critic_tau
         self.actor_update_frequency = actor_update_frequency
+        self.critic_update_frequency = critic_update_frequency
         self.critic_target_update_frequency = critic_target_update_frequency
         self.batch_size = batch_size
 

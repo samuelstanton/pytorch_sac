@@ -10,6 +10,7 @@ fwd_model:
       hidden_width: 200
       hidden_depth: 4
       activation: swish
+      init: trunc_normal
       max_epochs_since_update: 5
   fit_kwargs:
     batch_size: 256

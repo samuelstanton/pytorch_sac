@@ -181,3 +181,9 @@ class ReplayBuffer(object):
             self.idx = end
 
         self.last_save = self.idx
+
+    def return_all_samples(self):
+        arrays = [self.obses, self.actions, self.rewards, self.next_obses]
+        start_idx = self.idx - self.capacity if self.full else 0
+        idx_range = np.arange(start_idx, self.idx)
+        return [array[idx_range] for array in arrays]

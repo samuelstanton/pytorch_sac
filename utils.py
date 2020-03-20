@@ -89,10 +89,18 @@ def make_dir(*path_parts):
         pass
     return dir_path
 
+
 def weight_init(m):
     """Custom weight init for Conv2D and Linear layers."""
     if isinstance(m, nn.Linear):
         nn.init.orthogonal_(m.weight.data)
+        if hasattr(m.bias, 'data'):
+            m.bias.data.fill_(0.0)
+
+
+def keras_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight.data)
         if hasattr(m.bias, 'data'):
             m.bias.data.fill_(0.0)
 
@@ -103,11 +111,16 @@ class MLP(nn.Module):
                  hidden_dim,
                  output_dim,
                  hidden_depth,
-                 output_mod=None):
+                 output_mod=None,
+                 init='default'):
         super().__init__()
         self.trunk = mlp(input_dim, hidden_dim, output_dim, hidden_depth,
                          output_mod)
-        self.apply(weight_init)
+        if init == 'keras':
+            print("USING KERAS INITIALIZATION")
+            self.apply(keras_init)
+        else:
+            self.apply(weight_init)
 
     def forward(self, x):
         return self.trunk(x)

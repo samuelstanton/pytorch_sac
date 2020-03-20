@@ -12,6 +12,8 @@ import utils
 
 import hydra
 
+import env.termination_fns
+
 
 def step_fwd_model(fwd_model, obses, actions):
     inputs = np.concatenate((obses, actions), axis=-1)
@@ -136,7 +138,20 @@ class Workspace(object):
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                for _ in range(self.cfg.agent_update_freq):
+                sac_metrics = {}
+                for i in range(self.cfg.agent_update_freq):
+                    trans_batch = list(self.model_buffer.sample(self.agent.batch_size))
+                    del trans_batch[-2]  # we don't want the "not_done" field
+                    if i % self.agent.critic_update_frequency == 0:
+                        sac_metrics = self.agent.update_critic(*trans_batch, None, None)
+
+                    if i % self.agent.actor_update_frequency == 0:
+                        sac_metrics.update(self.agent.update_actor_and_alpha(trans_batch[0], None, None))
+
+                    if i % self.agent.critic_target_update_frequency == 0:
+                        utils.soft_update_params(self.agent.critic, self.agent.critic_target,
+                                                 self.agent.critic_tau)
+
                     sac_metrics = self.agent.update(self.model_buffer, self.logger, self.step)
                 if self.step % 2 == 0:
                     self.logger.log_dict(sac_metrics, self.step)
@@ -189,8 +204,10 @@ class Workspace(object):
             obses = obses.cpu().numpy()
             rewards, next_obses = step_fwd_model(self.fwd_model, obses, actions)
             for i in range(self.cfg.rollout_batch_size):
+                term_fn = getattr(env.termination_fns, self.cfg.task.name)
+                done_no_maxes = term_fn(obses, actions, next_obses)
                 # TODO add termination functions
-                transition = (obses[i], actions[i], rewards[i], next_obses[i], 0., 0.)
+                transition = (obses[i], actions[i], rewards[i], next_obses[i], 0., done_no_maxes[i])
                 self.model_buffer.add(*transition)
         print(f"[ forward model ]  rollouts complete, model buffer size - {len(self.model_buffer)}")
 
