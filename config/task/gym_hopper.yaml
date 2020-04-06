@@ -2,6 +2,10 @@ task:
   name: gym_hopper
   universe: openai_gym
   env: Hopper-v2
+
 agent:
   params:
     target_entropy: -1.
+
+h_sched: 20,100,1,15
+num_train_steps: 125000

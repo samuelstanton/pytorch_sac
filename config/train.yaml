@@ -38,6 +38,6 @@ max_episode_steps: null # If set, use shorter episodes
 
 # hydra configuration
 hydra:
-    name: ${env}
+    name: ${envs}
     run:
         dir: ./exp/${now:%Y.%m.%d}/${now:%H%M}_${agent.name}_${experiment}

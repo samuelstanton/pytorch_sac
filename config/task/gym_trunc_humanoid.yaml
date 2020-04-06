@@ -1,0 +1,15 @@
+task:
+  name: gym_trunc_humanoid
+  universe: openai_gym
+  env: pytorch_mbpo:HumanoidTruncatedObs-v2
+
+agent:
+  params:
+    target_entropy: -2.
+
+h_sched: 20,300,1,20
+num_train_steps: 300000
+fwd_model:
+  params:
+    submodule_params:
+      hidden_width: 400

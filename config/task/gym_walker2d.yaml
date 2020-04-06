@@ -5,3 +5,6 @@ task:
 agent:
   params:
     target_entropy: -3.
+
+h_sched: 20,100,1,1  # i.e. H is always 1
+num_train_steps: 300000

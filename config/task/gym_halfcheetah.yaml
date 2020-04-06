@@ -5,3 +5,7 @@ task:
 agent:
   params:
     target_entropy: -3.
+
+h_sched: 20,100,1,1
+num_train_steps: 400000
+agent_update_freq: 40  # as in Janner et al (2019)

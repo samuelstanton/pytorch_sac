@@ -1,0 +1,11 @@
+task:
+  name: gym_trunc_ant
+  universe: openai_gym
+  env: pytorch_mbpo:AntTruncatedObs-v2
+
+agent:
+  params:
+    target_entropy: -4.
+
+h_sched: 20,100,1,25
+num_train_steps: 300000

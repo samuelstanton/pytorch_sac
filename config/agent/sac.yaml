@@ -1,6 +1,6 @@
 agent:
   name: sac
-  class: agent.sac.SACAgent
+  class: pytorch_mbpo.pytorch_sac.agent.sac.SACAgent
   params:
     obs_dim: ??? # to be specified later
     action_dim: ??? # to be specified later
@@ -24,7 +24,7 @@ agent:
     batch_size: 256
     
 double_q_critic:
-  class: agent.critic.DoubleQCritic
+  class: pytorch_mbpo.pytorch_sac.agent.critic.DoubleQCritic
   params:
     obs_dim: ${agent.params.obs_dim}
     action_dim: ${agent.params.action_dim}
@@ -33,7 +33,7 @@ double_q_critic:
     init: keras
     
 diag_gaussian_actor:
-  class: agent.actor.DiagGaussianActor
+  class: pytorch_mbpo.pytorch_sac.agent.actor.DiagGaussianActor
   params:
     obs_dim: ${agent.params.obs_dim}
     action_dim: ${agent.params.action_dim}
