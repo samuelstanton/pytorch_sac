@@ -2,6 +2,13 @@ task:
   name: gym_hopper
   universe: openai_gym
   env: Hopper-v2
+  class: mbbl.env.gym_env.walker.env
+  params:
+    env_name: gym_hopper
+    rand_seed: ???
+    misc_info:
+      reset_type: gym
+
 agent:
   params:
     target_entropy: -1.

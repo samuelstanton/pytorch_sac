@@ -75,19 +75,38 @@ class SACAgent(Agent):
         assert action.ndim == 2 and action.shape[0] == 1
         return utils.to_np(action[0])
 
-    def update_critic(self, obs, action, reward, next_obs, not_done, logger, step):
-        dist = self.actor(next_obs)
-        next_action = dist.rsample()
-        log_prob = dist.log_prob(next_action).sum(-1, keepdim=True)
-        target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
-        target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_prob
-        target_Q = reward + (not_done * self.discount * target_V)
-        target_Q = target_Q.detach()
+    def get_fqi_targets(self, obses, actions, rewards, not_dones, log_probs):
+        """
+        :param obses (torch.Tensor): [horizon_len + 1, batch_size, obs_dim]
+        :param actions (torch.Tensor): [horizon_len + 1, batch_size, action_dim]
+        :param rewards (torch.Tensor): [horizon_len, batch_size]
+        :param not_dones (torch.Tensor): [horizon_len, batch_size]
+        :param log_probs (torch.Tensor): [horizon_len, batch_size]
+        :return:
+        """
+        horizon_len, _ = rewards.shape
+        target_Q1, target_Q2 = self.critic_target(obses[-1], actions[-1])
+        target_V = torch.min(target_Q1, target_Q2)
+        rewards = torch.cat([rewards, target_V.reshape(1, -1)])
+        discounts = torch.tensor((self.discount)) ** torch.arange(1, horizon_len + 1).unsqueeze(-1)
+        future_rewards = discounts * not_dones * (rewards[1:] - self.alpha.detach() * log_probs)
+        fqi_targets = rewards[0] + future_rewards.sum(0)
+
+        return fqi_targets.unsqueeze(-1).detach()
+
+    def update_critic(self, obs, action, fqi_targets, logger, step):
+        # dist = self.actor(next_obs)
+        # next_action = dist.rsample()
+        # log_prob = dist.log_prob(next_action).sum(-1, keepdim=True)
+        # target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
+        # target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_prob
+        # target_Q = reward + (not_done * self.discount * target_V)
+        # target_Q = target_Q.detach()
 
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action)
-        critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(
-            current_Q2, target_Q)
+        critic_loss = F.mse_loss(current_Q1, fqi_targets) + F.mse_loss(
+            current_Q2, fqi_targets)
 
         # Optimize the critic
         self.critic_optimizer.zero_grad()

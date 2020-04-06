@@ -1,5 +1,5 @@
 task:
-  name: gym_hopper
+  name: gym_cheetah
   universe: openai_gym
   env: HalfCheetah-v2
 agent:

@@ -105,22 +105,25 @@ class ReplayBuffer(object):
                 idxs.append(i)
         idxs = np.array(idxs)
 
-        obses, actions, rewards = [], [], []
+        obses, actions, rewards, not_dones = [], [], [], []
 
         for t in range(T):
             obses.append(self.obses[idxs + t])
             actions.append(self.actions[idxs + t])
             rewards.append(self.rewards[idxs + t])
+            not_dones.append(self.not_dones_no_max[idxs + t])
 
         obses = np.stack(obses)
         actions = np.stack(actions)
         rewards = np.stack(rewards).squeeze(2)
+        not_dones = np.stack(not_dones).squeeze(2)
 
         obses = torch.as_tensor(obses, device=self.device).float()
         actions = torch.as_tensor(actions, device=self.device)
         rewards = torch.as_tensor(rewards, device=self.device)
+        not_dones = torch.as_tensor(not_dones, device=self.device)
 
-        return obses, actions, rewards
+        return obses, actions, rewards, not_dones
 
     def save(self, save_dir):
         assert not self.full # Unimplemented

@@ -16,7 +16,7 @@ fit_fwd_freq: 250 # number of env steps per forward model update
 rollout_batch_size: 5000
 num_rollouts: 20
 rollouts_retained: 80
-rollout_length: 1
+rollout_len: 3
 model_buffer_capacity: 400000  # rollout_batch_size * rollouts_retained * rollout_length
 
 num_seed_steps: 5000

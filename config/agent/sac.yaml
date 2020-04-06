@@ -1,6 +1,7 @@
 agent:
   name: sac
   class: agent.sac.SACAgent
+  critic_update_type: mve
   params:
     obs_dim: ??? # to be specified later
     action_dim: ??? # to be specified later
